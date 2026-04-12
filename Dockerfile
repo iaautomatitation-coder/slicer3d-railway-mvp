@@ -1,65 +1,44 @@
 FROM ubuntu:22.04
 
-# Define variables for PrusaSlicer
-ENV PRUSA_URL="https://github.com/prusa3d/PrusaSlicer/releases/download/version_2.7.4/PrusaSlicer-2.7.4+linux-x64-GTK3-202404051128.AppImage"
-ENV PRUSA_DIR="/opt/prusa"
-ENV PRUSA_APP="$PRUSA_DIR/prusa-slicer.AppImage"
+ENV DEBIAN_FRONTEND=noninteractive
 
-# Install dependencies needed right away
 RUN apt-get update && apt-get install -y \
-    wget \
     curl \
-    fuse \
-    libglu1-mesa \
-    libgconf-2-4 \
+    wget \
+    ca-certificates \
+    gnupg \
+    xz-utils \
+    libgl1 \
     libgtk-3-0 \
-    libnss3 \
-    libxss1 \
-    libasound2 \
-    xvfb \
-    libosmesa6 \
-    dbus \
-    locales \
+    libglu1-mesa \
+    libwebkit2gtk-4.0-37 \
+    libgstreamer1.0-0 \
+    libgstreamer-plugins-base1.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# Set up Node.js directly
-RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
-    && rm -rf /var/lib/apt/lists/*
+    && node --version \
+    && npm --version
 
-# Create working directory
+RUN wget -O /tmp/prusa.deb https://github.com/prusa3d/PrusaSlicer/releases/download/version_2.7.4/prusa-slicer_2.7.4-1_amd64.deb \
+    && apt-get update \
+    && apt-get install -y /tmp/prusa.deb \
+    && rm /tmp/prusa.deb
+
 WORKDIR /app
 
-# Setup PrusaSlicer
-RUN mkdir -p $PRUSA_DIR && \
-    wget -qO $PRUSA_APP "$PRUSA_URL" && \
-    chmod +x $PRUSA_APP
-
-# Extract AppImage (required in Docker since FUSE has issues)
-WORKDIR $PRUSA_DIR
-RUN ./prusa-slicer.AppImage --appimage-extract
-
-# Set environment variable so the node app finds the executable
-ENV PRUSA_PATH="/opt/prusa/squashfs-root/AppRun"
-
-# Return to App Dir
-WORKDIR /app
-
-# Copy application files
 COPY package*.json ./
-RUN npm install --production
+RUN npm install --omit=dev
 
-# Directories for app logic
-COPY src/ ./src/
-COPY profiles/ ./profiles/
-COPY server.js ./
+COPY . .
 
-# Recreate temp directories just in case they were excluded by git
-RUN mkdir -p temp/uploads temp/outputs
+RUN mkdir -p /app/temp/uploads /app/temp/outputs
 
-# Expose port (Railway overrides this with $PORT)
 ENV PORT=3000
 EXPOSE 3000
 
-# Start server using Xvfb for headless execution
-CMD xvfb-run --auto-servernum --server-args="-screen 0 1024x768x24" node server.js
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3000/health', (r) => { process.exit(r.statusCode === 200 ? 0 : 1); });"
+
+CMD ["npm", "start"]
