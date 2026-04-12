@@ -26,7 +26,7 @@ ENV PRUSA_PATH=/opt/prusa-slicer.AppImage
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install --omit=dev
+RUN npm install
 
 COPY . .
 
