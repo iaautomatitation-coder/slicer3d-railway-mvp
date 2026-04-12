@@ -3,28 +3,22 @@ FROM ubuntu:22.04
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y \
-    curl \
     wget \
+    curl \
     ca-certificates \
-    gnupg \
-    xz-utils \
     libgl1 \
     libgtk-3-0 \
     libglu1-mesa \
-    libwebkit2gtk-4.0-37 \
-    libgstreamer1.0-0 \
-    libgstreamer-plugins-base1.0-0 \
+    nodejs \
+    npm \
     && rm -rf /var/lib/apt/lists/*
 
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y nodejs \
-    && node --version \
-    && npm --version
-
-RUN wget -O /tmp/prusa.deb https://github.com/prusa3d/PrusaSlicer/releases/download/version_2.7.4/prusa-slicer_2.7.4-1_amd64.deb \
-    && apt-get update \
-    && apt-get install -y /tmp/prusa.deb \
-    && rm /tmp/prusa.deb
+RUN wget -O /tmp/prusa.tar.bz2 https://github.com/prusa3d/PrusaSlicer/releases/download/version_2.7.4/PrusaSlicer-2.7.4+linux-x64-GTK3-202404080952.tar.bz2 \
+    && mkdir -p /opt/prusaslicer \
+    && tar -xjf /tmp/prusa.tar.bz2 -C /opt \
+    && mv /opt/PrusaSlicer-2.7.4+linux-x64-GTK3-202404080952 /opt/prusaslicer \
+    && ln -s /opt/prusaslicer/prusa-slicer /usr/local/bin/prusa-slicer \
+    && rm /tmp/prusa.tar.bz2
 
 WORKDIR /app
 
