@@ -6,19 +6,22 @@ RUN apt-get update && apt-get install -y \
     wget \
     curl \
     ca-certificates \
+    fuse \
     libgl1 \
     libgtk-3-0 \
     libglu1-mesa \
+    libwebkit2gtk-4.0-37 \
+    libgstreamer1.0-0 \
+    libgstreamer-plugins-base1.0-0 \
+    xvfb \
     nodejs \
     npm \
     && rm -rf /var/lib/apt/lists/*
 
-RUN wget -O /tmp/prusa.tar.bz2 https://github.com/prusa3d/PrusaSlicer/releases/download/version_2.7.4/PrusaSlicer-2.7.4+linux-x64-GTK3-202404080952.tar.bz2 \
-    && mkdir -p /opt/prusaslicer \
-    && tar -xjf /tmp/prusa.tar.bz2 -C /opt \
-    && mv /opt/PrusaSlicer-2.7.4+linux-x64-GTK3-202404080952 /opt/prusaslicer \
-    && ln -s /opt/prusaslicer/prusa-slicer /usr/local/bin/prusa-slicer \
-    && rm /tmp/prusa.tar.bz2
+RUN wget -O /opt/prusa-slicer.AppImage https://github.com/prusa3d/PrusaSlicer/releases/download/version_2.7.4/PrusaSlicer-2.7.4+linux-x64-GTK3-202404050928.AppImage \
+    && chmod +x /opt/prusa-slicer.AppImage
+
+ENV PRUSA_PATH=/opt/prusa-slicer.AppImage
 
 WORKDIR /app
 
@@ -33,6 +36,6 @@ ENV PORT=3000
 EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000/health', (r) => { process.exit(r.statusCode === 200 ? 0 : 1); });"
+  CMD node -e "require('http').get('http://localhost:3000/health', (r) => { process.exit(r.statusCode === 200 ? 0 : 1); }).on('error', () => process.exit(1));"
 
-CMD ["npm", "start"]
+CMD ["xvfb-run", "--auto-servernum", "--server-args=-screen 0 1024x768x24", "npm", "start"]
