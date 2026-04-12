@@ -54,4 +54,4 @@ function parseGCode(filePath) {
     }
 }
 
-module.exports = { parseGCode };
+module.exports = { parseGCode, parseGcode: parseGCode };
