@@ -50,7 +50,12 @@ app.post('/quote', upload.single('file'), async (req, res) => {
         return res.status(400).json({ success: false, error: 'No se ha subido ningún archivo.' });
     }
 
-    const stlPath = req.file.path;
+    let stlPath = req.file.path;
+
+const ext = require("path").extname(req.file.originalname);
+const newPath = stlPath + ext;
+require("fs").renameSync(stlPath, newPath);
+stlPath = newPath;
     const originalName = req.file.originalname;
 
     try {
