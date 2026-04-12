@@ -1,3 +1,5 @@
+console.log("SERVER STARTING...");
+console.log("SERVER STARTING...");
 const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
@@ -92,6 +94,7 @@ function formatTime(totalMinutes) {
     return `${m}m`;
 }
 
+console.log("ABOUT TO LISTEN...");
 app.listen(PORT, () => {
     console.log(`🚀 Slicer Quoting Backend listening on port ${PORT}`);
     console.log(`📍 Configured Filament Cost: $${COSTO_FILAMENTO_KG}/kg`);
