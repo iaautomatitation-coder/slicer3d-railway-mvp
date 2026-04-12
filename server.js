@@ -14,6 +14,8 @@ const COSTO_FILAMENTO_KG = parseFloat(process.env.COSTO_FILAMENTO_KG) || 400;
 app.use(cors());
 app.use(express.json());
 
+app.get("/health", (req, res) => res.json({ status: "ok" }));
+
 // Setup temporary folder for uploads
 const UPLOAD_DIR = path.resolve(__dirname, 'temp/uploads');
 const OUTPUT_DIR = path.resolve(__dirname, 'temp/outputs');
