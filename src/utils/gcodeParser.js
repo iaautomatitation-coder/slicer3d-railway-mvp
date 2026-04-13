@@ -5,12 +5,12 @@ function parseGCode(filePath) {
         const content = fs.readFileSync(filePath, 'utf8');
 
         const grams = extractNumber(content, [
-            /filament used \[g\]\s*=\s*([\d.]+)/i,
-            /total filament used \[g\]\s*=\s*([\d.]+)/i,
-            /filament used.*?\(([\d.]+)\s*g\)/i,
-            /filament used\s*=\s*([\d.]+)\s*g/i,
-            /filament used:\s*([\d.]+)\s*g/i
-        ]);
+    /filament used \[g\]\s*=\s*([\d.]+)/i,
+    /filament used\s*=\s*([\d.]+)\s*g/i,
+    /filament used:\s*([\d.]+)\s*g/i,
+    /total filament used\s*=\s*([\d.]+)\s*g/i,
+    /filament used.*?([\d.]+)\s*g/i
+]);
 
         const lengthMm = extractNumber(content, [
             /filament used \[mm\]\s*=\s*([\d.]+)/i,
