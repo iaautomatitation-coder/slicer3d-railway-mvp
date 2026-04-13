@@ -27,9 +27,17 @@ function parseGCode(filePath) {
 
         const timeMinutes = timeLine ? parseTimeToMinutes(timeLine) : null;
 
-        return {
-            success: true,
-            grams: grams,
+        const diameter = 1.75;
+const density = 1.25;
+let gramsCalc = grams;
+if (!gramsCalc && lengthMm) {
+    const radius = diameter / 2;
+    const volume = Math.PI * radius * radius * lengthMm;
+    gramsCalc = volume * density / 1000;
+}
+return {
+    success: true,
+    grams: parseFloat((gramsCalc || 0).toFixed(2)),
             timeMinutes: timeMinutes,
             lengthMm: lengthMm
         };
