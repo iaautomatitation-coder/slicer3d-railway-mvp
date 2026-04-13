@@ -22,13 +22,20 @@ function slice(stlPath, outputDir) {
             }
 
             try {
+                const gcodeText = fs.readFileSync(gcodePath, 'utf8');
+                const lastLines = gcodeText.split('\n').slice(-120).join('\n');
+
+                console.log('===== GCODE LAST 120 LINES START =====');
+                console.log(lastLines);
+                console.log('===== GCODE LAST 120 LINES END =====');
+
                 const parsed = parseGcode(gcodePath);
 
                 const metrics = {
                     success: true,
-                    grams: parsed.filamento_gramos,
-                    timeMinutes: (parsed.tiempo_horas * 60) + parsed.tiempo_minutos + (parsed.tiempo_segundos / 60),
-                    lengthMm: null
+                    grams: parsed.grams,
+                    timeMinutes: parsed.timeMinutes,
+                    lengthMm: parsed.lengthMm
                 };
 
                 if (fs.existsSync(gcodePath)) {
