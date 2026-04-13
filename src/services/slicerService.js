@@ -13,45 +13,30 @@ function slice(stlPath, outputDir) {
 
         const cmd = `"${PRUSA_PATH}" --load "${PROFILE_PATH}" --export-gcode "${stlPath}" --output "${gcodePath}"`;
 
-        console.log(`[SLICER] Executing: ${cmd}`);
-
         exec(cmd, (error, stdout, stderr) => {
             if (error) {
-                console.error(`[SLICER-ERR] ${error.message}`);
                 return reject(new Error(`Slicing failed: ${stderr || error.message}`));
             }
 
             try {
-                const gcodeText = fs.readFileSync(gcodePath, 'utf8');
-
-                const metricLines = gcodeText
-                    .split('\n')
-                    .filter(line => /filament|estimated printing time|total estimated time/i.test(line));
-
-                console.log('===== GCODE METRIC LINES START =====');
-                console.log(metricLines.join('\n'));
-                console.log('===== GCODE METRIC LINES END =====');
-
                 const parsed = parseGcode(gcodePath);
-
-                const metrics = {
-                    success: true,
-                    grams: parsed.grams,
-                    timeMinutes: parsed.timeMinutes,
-                    lengthMm: parsed.lengthMm
-                };
 
                 if (fs.existsSync(gcodePath)) {
                     fs.unlinkSync(gcodePath);
                 }
 
-                resolve(metrics);
+                resolve({
+                    grams: parsed.grams,
+                    timeMinutes: parsed.timeMinutes,
+                    lengthMm: parsed.lengthMm
+                });
+
             } catch (parseError) {
                 if (fs.existsSync(gcodePath)) {
                     fs.unlinkSync(gcodePath);
                 }
 
-                reject(new Error(`Failed to parse G-code output: ${parseError.message}`));
+                reject(new Error(`Parse failed: ${parseError.message}`));
             }
         });
     });
