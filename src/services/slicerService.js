@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const { parseGcode } = require('../utils/gcodeParser');
 
-const PRUSA_PATH = process.env.PRUSA_PATH || 'prusa-slicer';
+const PRUSA_PATH = process.env.PRUSA_PATH || '/opt/squashfs-root/AppRun';
 const PROFILE_PATH = path.resolve(__dirname, '../../profiles/bambu_a1mini_quote.ini');
 
 function slice(stlPath, outputDir) {
@@ -23,11 +23,14 @@ function slice(stlPath, outputDir) {
 
             try {
                 const gcodeText = fs.readFileSync(gcodePath, 'utf8');
-                const lastLines = gcodeText.split('\n').slice(-120).join('\n');
 
-                console.log('===== GCODE LAST 120 LINES START =====');
-                console.log(lastLines);
-                console.log('===== GCODE LAST 120 LINES END =====');
+                const metricLines = gcodeText
+                    .split('\n')
+                    .filter(line => /filament|estimated printing time|total estimated time/i.test(line));
+
+                console.log('===== GCODE METRIC LINES START =====');
+                console.log(metricLines.join('\n'));
+                console.log('===== GCODE METRIC LINES END =====');
 
                 const parsed = parseGcode(gcodePath);
 
