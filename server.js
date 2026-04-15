@@ -1,108 +1,126 @@
-console.log("SERVER STARTING...");
-console.log("SERVER STARTING...");
+'use strict';
+
+// ============================================================
+// PrintLab 3D — server.js
+// Backend Railway: Express + PrusaSlicer CLI
+// GET  /health  → estado del servidor
+// POST /quote   → slicing real + métricas
+// ============================================================
+
 const express = require('express');
-const cors = require('cors');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
+const cors    = require('cors');
+const multer  = require('multer');
+const path    = require('path');
+const fs      = require('fs');
+
 const { slice } = require('./src/services/slicerService');
 
-const app = express();
+const app  = express();
 const PORT = process.env.PORT || 3000;
-const COSTO_FILAMENTO_KG = parseFloat(process.env.COSTO_FILAMENTO_KG) || 400;
+const COSTO_FILAMENTO_KG = parseFloat(process.env.COSTO_FILAMENTO_KG || '400');
 
 app.use(cors());
 app.use(express.json());
 
-app.get("/health", (req, res) => res.json({ status: "ok" }));
-
-// Setup temporary folder for uploads
+// ── Directorios temporales ────────────────────────────────────
 const UPLOAD_DIR = path.resolve(__dirname, 'temp/uploads');
 const OUTPUT_DIR = path.resolve(__dirname, 'temp/outputs');
+fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 
-if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-if (!fs.existsSync(OUTPUT_DIR)) fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+// ── Multer ────────────────────────────────────────────────────
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, UPLOAD_DIR),
+    filename: (req, file, cb) => {
+        const ext     = path.extname(file.originalname).toLowerCase();
+        const safeName = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}${ext}`;
+        cb(null, safeName);
+    },
+});
 
-const upload = multer({ 
-    dest: UPLOAD_DIR,
+const upload = multer({
+    storage,
+    limits: { fileSize: 100 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
         const ext = path.extname(file.originalname).toLowerCase();
-        if (['.stl', '.3mf'].includes(ext)) {
-            cb(null, true);
-        } else {
-            cb(new Error('Solo se admiten archivos .stl o .3mf'), false);
-        }
-    }
+        if (ext === '.stl') return cb(null, true);
+        cb(new Error(`Formato no soportado: ${ext}. Solo .stl`), false);
+    },
 });
 
-/**
- * Endpoint: GET /health
- */
+// ── GET /health ───────────────────────────────────────────────
 app.get('/health', (req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString(), service: 'slicer3d-quote-backend' });
+    res.json({ status: 'ok' });
 });
 
-/**
- * Endpoint: POST /quote
- */
+// ── GET / ─────────────────────────────────────────────────────
+app.get('/', (req, res) => {
+    res.json({ status: 'ok', service: 'PrintLab 3D Slicer API', endpoints: ['GET /health', 'POST /quote'] });
+});
+
+// ── POST /quote ───────────────────────────────────────────────
 app.post('/quote', upload.single('file'), async (req, res) => {
     if (!req.file) {
-        return res.status(400).json({ success: false, error: 'No se ha subido ningún archivo.' });
+        return res.status(400).json({ success: false, error: 'No se recibió archivo .stl' });
     }
 
-    let stlPath = req.file.path;
-
-const ext = require("path").extname(req.file.originalname);
-const newPath = stlPath + ext;
-require("fs").renameSync(stlPath, newPath);
-stlPath = newPath;
+    const stlPath     = req.file.path;
     const originalName = req.file.originalname;
+    console.log(`[QUOTE] ${originalName} (${(req.file.size / 1024).toFixed(1)} KB)`);
 
     try {
-        console.log(`[QUOTE-REQUEST] Processing file: ${originalName}`);
-        
-        // Execute Slicing
         const metrics = await slice(stlPath, OUTPUT_DIR);
-        
-        // Calculate Cost
-        const cost = (metrics.grams * COSTO_FILAMENTO_KG) / 1000;
-        
-        // Cleanup input file
-        fs.unlinkSync(stlPath);
+        const cost    = parseFloat(((metrics.grams * COSTO_FILAMENTO_KG) / 1000).toFixed(2));
 
-        // Final Response
         res.json({
-            success: true,
+            success:  true,
             fileName: originalName,
             metrics: {
-                grams: metrics.grams,
-                timeMinutes: metrics.timeMinutes,
+                grams:         metrics.grams,
+                timeMinutes:   metrics.timeMinutes,
                 timeFormatted: formatTime(metrics.timeMinutes),
-                lengthMm: metrics.lengthMm
+                lengthMm:      metrics.lengthMm,
             },
             quote: {
-                filamentCost: parseFloat(cost.toFixed(2)),
-                currency: 'MXN',
-                costPerKg: COSTO_FILAMENTO_KG
-            }
+                filamentCost: cost,
+                currency:     'MXN',
+                costPerKg:    COSTO_FILAMENTO_KG,
+            },
         });
 
-    } catch (error) {
-        console.error(`[QUOTE-ERR] Error for ${originalName}:`, error.message);
-        if (fs.existsSync(stlPath)) fs.unlinkSync(stlPath);
-        res.status(500).json({ success: false, error: error.message });
+    } catch (err) {
+        console.error(`[QUOTE-ERR] ${originalName}:`, err.message);
+        const status = err.message.includes('Slicing fallido') ? 500
+                     : err.message.includes('timeout')         ? 504
+                     : 500;
+        res.status(status).json({ success: false, error: err.message });
+    } finally {
+        // Limpiar STL en todos los casos
+        try { if (fs.existsSync(stlPath)) fs.unlinkSync(stlPath); } catch {}
     }
 });
 
+// ── Error handler multer ──────────────────────────────────────
+app.use((err, req, res, next) => {
+    if (err.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'Archivo demasiado grande. Máximo 100 MB.' });
+    if (err.message?.includes('Formato no soportado')) return res.status(415).json({ error: err.message });
+    console.error('[SERVER-ERR]', err);
+    res.status(500).json({ error: 'Error interno del servidor' });
+});
+
+// ── Helpers ───────────────────────────────────────────────────
 function formatTime(totalMinutes) {
     const h = Math.floor(totalMinutes / 60);
     const m = Math.round(totalMinutes % 60);
-    if (h > 0) return `${h}h ${m}m`;
+    if (h > 0 && m > 0) return `${h}h ${m}m`;
+    if (h > 0) return `${h}h`;
     return `${m}m`;
 }
 
-console.log("ABOUT TO LISTEN...");
+// ── Arranque ──────────────────────────────────────────────────
 app.listen(PORT, () => {
-    console.log(`🚀 Slicer Quoting Backend listening on port ${PORT}`);
-    console.log(`📍 Configured Filament Cost: $${COSTO_FILAMENTO_KG}/kg`);
+    console.log(`[server] PrintLab 3D Slicer API — puerto ${PORT}`);
+    console.log(`[server] COSTO_FILAMENTO_KG: $${COSTO_FILAMENTO_KG}`);
 });
+
+module.exports = app;
